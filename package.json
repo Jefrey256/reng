@@ -1,0 +1,13 @@
+{
+  "name": "reng_bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "baileys": "^6.7.9",
+    "path": "^0.12.7",
+    "pino": "^9.6.0",
+    "readline": "^1.3.0",
+    "typescript": "^5.7.2"
+  }
+}
