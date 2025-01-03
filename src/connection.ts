@@ -2,7 +2,8 @@ import makeWASocket,{useMultiFileAuthState, fetchLatestBaileysVersion, Disconnec
 import path, { resolve } from "path";
 import readline from "readline"
 import pino from "pino";
-import { extractMessage } from "./exports/messages";
+
+
 
 
 export async function reng ():Promise<void> {
@@ -17,7 +18,7 @@ export async function reng ():Promise<void> {
             rl.question(text,resolve)
         })
     }
-    const logger = pino({level: "silent"})
+    const logger = pino().child({ level: "silent" , stream: "store"})
 
     const store = makeInMemoryStore({})
     store.readFromFile(path.resolve(__dirname, "../database/data-store/store.json"))
@@ -67,20 +68,32 @@ export async function reng ():Promise<void> {
         console.log("Tem conversas", store.chats.all())
     })
     
-    riko.ev.on("chats.update", async (updates: {id: string; unreadCount: number}[])=>{
-        for (const chat of updates){
-            console.log(`Chat atualizado: ${chat.id}, messagens não lidas: ${chat.unreadCount}`)
+    riko.ev.on("chats.update", async (updates: { id: string; unreadCount: number }[]) => {
+        for (const chat of updates) {
+            try {
+                const metadata = await riko.groupMetadata(chat.id);
+                const groupName = metadata.subject; 
+    
+                console.log(`Grupo atualizado: ${groupName}, mensagens não lidas: ${chat.unreadCount}`);
+            } catch (err) {
+                console.error(`Erro ao obter metadados para o chat ${chat.id}:`, err);
+            }
         }
-
-    })
+    });
+    
 
     riko.ev.on("messages.upsert", async (reng)=>{
         const message = reng.messages && reng.messages[0]
         if (!message || !message.message) return
-        const{userName, textMessage,from} = extractMessage(riko)
+        const from = message.key.remoteJid
+        const fromUser = message.key.participant?.split("@")[0] || message.key.remoteJid?.split("@")[0]
+        const userName = message.pushName || fromUser
+        const textMessage = message.message.conversation || message.message.extendedTextMessage?.text || ""
+        const groupName = from.endsWith("@g.us") ? (await riko.groupMetadata(from)).subject : "" 
+        console.log("metadados",groupName)
 
         if (textMessage) {
-            const tolowerCase = textMessage.tolowerCase()
+            const tolowerCase = textMessage.toLowerCase()
             if (tolowerCase.includes("oi") || tolowerCase.includes("ola")) {
                 console.log("repondendo")
                 await riko.sendMessage(from, {

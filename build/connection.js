@@ -50,7 +50,6 @@ const baileys_1 = __importStar(require("baileys"));
 const path_1 = __importDefault(require("path"));
 const readline_1 = __importDefault(require("readline"));
 const pino_1 = __importDefault(require("pino"));
-const messages_1 = require("./exports/messages");
 function reng() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -65,7 +64,7 @@ function reng() {
                 rl.question(text, resolve);
             });
         };
-        const logger = (0, pino_1.default)({ level: "silent" });
+        const logger = (0, pino_1.default)().child({ level: "silent", stream: "store" });
         const store = (0, baileys_1.makeInMemoryStore)({});
         store.readFromFile(path_1.default.resolve(__dirname, "../database/data-store/store.json"));
         setInterval(() => {
@@ -110,16 +109,29 @@ function reng() {
         });
         riko.ev.on("chats.update", (updates) => __awaiter(this, void 0, void 0, function* () {
             for (const chat of updates) {
-                console.log(`Chat atualizado: ${chat.id}, messagens não lidas: ${chat.unreadCount}`);
+                try {
+                    const metadata = yield riko.groupMetadata(chat.id);
+                    const groupName = metadata.subject;
+                    console.log(`Grupo atualizado: ${groupName}, mensagens não lidas: ${chat.unreadCount}`);
+                }
+                catch (err) {
+                    console.error(`Erro ao obter metadados para o chat ${chat.id}:`, err);
+                }
             }
         }));
         riko.ev.on("messages.upsert", (reng) => __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c;
             const message = reng.messages && reng.messages[0];
             if (!message || !message.message)
                 return;
-            const { userName, textMessage, from } = (0, messages_1.extractMessage)(riko);
+            const from = message.key.remoteJid;
+            const fromUser = ((_a = message.key.participant) === null || _a === void 0 ? void 0 : _a.split("@")[0]) || ((_b = message.key.remoteJid) === null || _b === void 0 ? void 0 : _b.split("@")[0]);
+            const userName = message.pushName || fromUser;
+            const textMessage = message.message.conversation || ((_c = message.message.extendedTextMessage) === null || _c === void 0 ? void 0 : _c.text) || "";
+            const groupName = from.endsWith("@g.us") ? (yield riko.groupMetadata(from)).subject : "";
+            console.log("metadados", groupName);
             if (textMessage) {
-                const tolowerCase = textMessage.tolowerCase();
+                const tolowerCase = textMessage.toLowerCase();
                 if (tolowerCase.includes("oi") || tolowerCase.includes("ola")) {
                     console.log("repondendo");
                     yield riko.sendMessage(from, {
