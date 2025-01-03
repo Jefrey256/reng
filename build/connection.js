@@ -50,6 +50,7 @@ const baileys_1 = __importStar(require("baileys"));
 const path_1 = __importDefault(require("path"));
 const readline_1 = __importDefault(require("readline"));
 const pino_1 = __importDefault(require("pino"));
+const messages_1 = require("./exports/messages");
 function reng() {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -64,7 +65,12 @@ function reng() {
                 rl.question(text, resolve);
             });
         };
-        const logger = (0, pino_1.default)({ level: "debug" });
+        const logger = (0, pino_1.default)({ level: "silent" });
+        const store = (0, baileys_1.makeInMemoryStore)({});
+        store.readFromFile(path_1.default.resolve(__dirname, "../database/data-store/store.json"));
+        setInterval(() => {
+            store.writeToFile(path_1.default.resolve(__dirname, "../database/data-store/store.json"));
+        }, 10000);
         const riko = (0, baileys_1.default)({
             printQRInTerminal: false,
             version,
@@ -91,7 +97,7 @@ function reng() {
         });
         if (!((_a = state.creds) === null || _a === void 0 ? void 0 : _a.registered)) {
             let phoneNumber = yield question("Digite seu número de telefone: ");
-            phoneNumber = phoneNumber.replace(/[0-9]/g, "");
+            phoneNumber = phoneNumber.replace(/[^0-9]/g, "");
             if (!phoneNumber) {
                 throw new Error("Número de Telefone inválido");
             }
@@ -99,5 +105,28 @@ function reng() {
             console.log(`Codigo de Pareamento: ${code}`);
         }
         riko.ev.on("creds.update", saveCreds);
+        riko.ev.on("chats.upsert", () => {
+            console.log("Tem conversas", store.chats.all());
+        });
+        riko.ev.on("chats.update", (updates) => __awaiter(this, void 0, void 0, function* () {
+            for (const chat of updates) {
+                console.log(`Chat atualizado: ${chat.id}, messagens não lidas: ${chat.unreadCount}`);
+            }
+        }));
+        riko.ev.on("messages.upsert", (reng) => __awaiter(this, void 0, void 0, function* () {
+            const message = reng.messages && reng.messages[0];
+            if (!message || !message.message)
+                return;
+            const { userName, textMessage, from } = (0, messages_1.extractMessage)(riko);
+            if (textMessage) {
+                const tolowerCase = textMessage.tolowerCase();
+                if (tolowerCase.includes("oi") || tolowerCase.includes("ola")) {
+                    console.log("repondendo");
+                    yield riko.sendMessage(from, {
+                        text: "Ola tudo Bem"
+                    });
+                }
+            }
+        }));
     });
 }
